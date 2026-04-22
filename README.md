@@ -1,176 +1,165 @@
-# Alfresco S3 Adapter
+# S3 Open Connector
 
-This project is meant to provide tools to use s3 as a storage solution for Alfresco. It can be configured to work as a main content store if you are a community user. If you are an enterprise customer you can configure it to work with content store selector or as a main content store.
+Conector de Content Store S3/MinIO para Alfresco Content Services 26.1 Community. Reemplaza el almacenamiento de contenido por defecto (filesystem local) por un bucket S3-compatible, con una capa de cache local para mantener el rendimiento.
 
-## History
-
- * Forked from https://github.com/rmberg/alfresco-s3-adapter which originally was migrated from the `alfresco-cloud-store` project at https://code.google.com/p/alfresco-cloud-store/.
- * Apache License 2.0
- * Uses Amazon SDK 1.x
- * Uses Alfresco SDK 3.0 and tested with Alfresco 5.2
- * Pull Requests / Issues / Contributions are welcomed!
- * Use Findify s3mock for testing
- 
-# Alfresco AIO Project - SDK 4.0
-
-This is an All-In-One (AIO) project for Alfresco SDK 4.0.
-
-Run with `./run.sh build_start` or `./run.bat build_start` and verify that it
-
- * Runs Alfresco Content Service (ACS)
- * Runs Alfresco Share
- * Runs Alfresco Search Service (ASS)
- * Runs PostgreSQL database
- * Deploys the JAR assembled modules
- 
-All the services of the project are now run as docker containers. The run script offers the next tasks:
-
- * `build_start`. Build the whole project, recreate the ACS and Share docker images, start the dockerised environment composed by ACS, Share, ASS and 
- PostgreSQL and tail the logs of all the containers.
- * `build_start_it_supported`. Build the whole project including dependencies required for IT execution, recreate the ACS and Share docker images, start the 
- dockerised environment composed by ACS, Share, ASS and PostgreSQL and tail the logs of all the containers.
- * `start`. Start the dockerised environment without building the project and tail the logs of all the containers.
- * `stop`. Stop the dockerised environment.
- * `purge`. Stop the dockerised container and delete all the persistent data (docker volumes).
- * `tail`. Tail the logs of all the containers.
- * `reload_share`. Build the Share module, recreate the Share docker image and restart the Share container.
- * `reload_acs`. Build the ACS module, recreate the ACS docker image and restart the ACS container.
- * `build_test`. Build the whole project, recreate the ACS and Share docker images, start the dockerised environment, execute the integration tests from the
- `integration-tests` module and stop the environment.
- * `test`. Execute the integration tests (the environment must be already started).
-
-# Few things to notice
-
- * No parent pom
- * No WAR projects, the jars are included in the custom docker images
- * No runner project - the Alfresco environment is now managed through [Docker](https://www.docker.com/)
- * Standard JAR packaging and layout
- * Works seamlessly with Eclipse and IntelliJ IDEA
- * JRebel for hot reloading, JRebel maven plugin for generating rebel.xml [JRebel integration documentation]
- * AMP as an assembly
- * Persistent test data through restart thanks to the use of Docker volumes for ACS, ASS and database data
- * Integration tests module to execute tests against the final environment (dockerised)
- * Resources loaded from META-INF
- * Web Fragment (this includes a sample servlet configured via web fragment)
-
-## Installation
-
- * This module does not work stand alone out of the box but will require further configuration. Either install it as an amp in your alfresco installation and configure it using spring xml files in shared/classes/extension/s3-override-context.xml.
- * If you have your own amp project you can include the s3 module as a dependency.
- 
-### Use as content store selector
-The following code snippet can be used to configure the module to work in an enterprise setup with a content store selector.
- 
- ```
- <?xml version='1.0' encoding='UTF-8'?>
-<beans xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="http://www.springframework.org/schema/beans
-          http://www.springframework.org/schema/beans/spring-beans.xsd">
-  <!-- Change the default store to a content store selector-->
-  <bean id="contentService" parent="baseContentService">
-    <property name="store">
-      <ref bean="storeSelectorContentStore" />
-    </property>
-  </bean>
-  
-  <!-- Configure the content store selector to use the file store as a default store and s3 as a backup -->
-  <bean id="storeSelectorContentStore" parent="storeSelectorContentStoreBase">
-    <property name="defaultStoreName">
-      <value>default</value>
-    </property>
-    <property name="storesByName">
-      <map>
-        <entry key="default">
-          <ref bean="fileContentStore" />
-        </entry>
-        <entry key="s3main">
-          <ref bean="redpill.defaultCachedS3BackedContentStore" />
-        </entry>
-      </map>
-    </property>
-  </bean>
-  
-  <!-- Tell the system to delete using the contentSelectorContentStore as well -->
-  <bean id="contentStoresToClean" class="java.util.ArrayList" >
-    <constructor-arg>
-      <list>
-        <ref bean="fileContentStore" />
-        <ref bean="redpill.defaultCachedS3BackedContentStore" />
-      </list>
-    </constructor-arg>
-  </bean>
-</beans> 
-```
- 
-### Use as a main content store
-The following code snippet can be used to configure the module to work as a caching content store backed by s3.
+## Arquitectura
 
 ```
-<?xml version='1.0' encoding='UTF-8'?>
-<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-  <!--  Caching Content Store -->
-  <bean id="fileContentStore" class="org.alfresco.repo.content.caching.CachingContentStore" init-method="init">
-    <property name="backingStore" ref="redpill.defaultS3ContentStore"/>
-    <property name="cache" ref="redpill.defaultS3ContentCache"/>
-    <property name="cacheOnInbound" value="${system.content.caching.cacheOnInbound}"/>
-    <property name="quota" ref="redpill.defaultS3QuotaManager" />
-  </bean>
-</beans> 
+ACS Platform
+    │
+    ▼
+fileContentStore (alias)
+    │
+    ▼
+CachingContentStore
+    │           │
+    │    Cache local (/tmp/cachedcontent)
+    │           │
+    ▼
+MinIOContentStore (backing store)
+    │
+    ▼
+MinIO / S3 Bucket
+    └── alfresco/contentstore/<año>/<mes>/<día>/<hora>/<min>/<guid>.bin
 ```
 
-## Configuration
-* After installing the package you will need to add some properties to your `alfresco-global.properties` file:
- 
-```
-# Your AWS credentials
-# Alternatively these can be set in the standard locations the AWS SDK will search for them
-# For example: if you are running on an EC2 instance and are using IAM roles, you can leave these blank and the credentials
-# for the role will be used.
-aws.accessKey=
-aws.secretKey=
+### Capas del conector
 
-# The AWS Region (US-EAST-1) will be used by default if not specified
-aws.regionName=us-east-1
+| Capa | Clase | Responsabilidad |
+|---|---|---|
+| **CachingContentStore** | `org.alfresco.repo.content.caching.CachingContentStore` | Cache local en disco. Primera capa de lectura/escritura. Delega al backing store cuando el contenido no está en cache. |
+| **ContentCacheImpl** | `org.alfresco.repo.content.caching.ContentCacheImpl` | Implementación del cache: memoria (Infinispan) + disco. Gestiona el ciclo de vida de los archivos cacheados. |
+| **StandardQuotaStrategy** | `org.alfresco.repo.content.caching.quota.StandardQuotaStrategy` | Control de cuota del cache. Cuando se supera `maxUsageMB`, limpia archivos viejos. |
+| **CachedContentCleaner** | `org.alfresco.repo.content.caching.cleanup.CachedContentCleaner` | Job que limpia archivos del cache local que ya fueron subidos al backing store y superan `minFileAgeMillis`. |
+| **MinIOContentStore** | `com.assa.alfresco.s3.MinIOContentStore` | Backing store S3. Lee, escribe y elimina objetos en el bucket. Usa AWS SDK v2. |
+| **MinIOContentWriter** | `com.assa.alfresco.s3.MinIOContentWriter` | Escribe contenido: primero a un temp file local, luego sube a S3 al cerrar el stream. |
+| **MinIOContentReader** | `com.assa.alfresco.s3.MinIOContentReader` | Lee contenido: obtiene metadata via `headObject()` y contenido via `getObject()`. |
+| **MinIOWriteStreamListener** | `com.assa.alfresco.s3.MinIOWriteStreamListener` | Se ejecuta al cerrar el stream de escritura. Sube el temp file a S3 via `PutObjectRequest`. |
 
-# The S3 bucket name to use as the content store
-aws.s3.bucketName=
-
-# The endpoint url if other than AWS (for other S3-compatible vendors)
-aws.s3.endpoint=
-
-# The relative path (S3 KEY) within the bucket to use as the content store (useful if the bucket is not dedicated to alfresco content)
-aws.s3.rootDirectory=/alfresco/contentstore
-
-# Signing version for s3 sdk. If empty this will be the default for the current sdk version. When working with custom s3 providers, this might have to be changed. Currently allowed values are <empty>, AWSS3V4SignerType and S3SignerType.
-aws.s3.signatureVersion=
-
-# Connection timeout for the s3 client
-aws.s3.client.connectionTimeout=50000
-# Connection time to live in the s3 client connection pool
-aws.s3.client.connectionTTL=60000
-# Number of retries on error in the s3 client
-aws.s3.client.maxErrorRetry=5
-# Multipart upload threshold in bytes.
-# 1099511627776 = 1tb
-# 1073741824 = 1gb
-# 104857600 = 100mb
-# 16777216 = 16mb
-aws.s3.client.multipartUploadThreshold=16777216
-
-# The cache size
-defaultS3QuotaManager.maxUsageMB=4096
-# The max file size in MB to store in cache 0 means no limit
-defaultS3QuotaManager.maxFileSizeMB=0
-# Content cache dir
-defaultS3ContentCache.cachedcontent=/tmp/cachedcontent
-```
- 
-## Troubleshooting ##
-Enable debug logging in log4j by adding these lines to your log4j.properties file
+### Flujo de escritura
 
 ```
-log4j.logger.org.redpill.alfresco.s3=trace
-log4j.logger.com.amazonaws.requestId=debug
-log4j.logger.com.amazonaws.request=debug
-``` 
+1. Alfresco solicita un ContentWriter al CachingContentStore
+2. CachingContentStore delega a MinIOContentStore.getWriterInternal()
+3. MinIOContentWriter crea un temp file local y retorna un WritableByteChannel
+4. Alfresco escribe el contenido en el channel
+5. Al cerrar el stream → MinIOWriteStreamListener.contentStreamClosed()
+6. putObject() sube el temp file a S3
+7. El temp file se elimina
+8. CachingContentStore guarda una copia en el cache local (cacheOnInbound=true)
+```
+
+### Flujo de lectura
+
+```
+1. Alfresco solicita un ContentReader al CachingContentStore
+2. Si el contenido está en cache local → sirve desde ahí (cache hit)
+3. Si no está en cache → CachingContentStore solicita reader al MinIOContentStore
+4. MinIOContentReader obtiene metadata (headObject) y contenido (getObject)
+5. El contenido se copia al cache local para futuras lecturas
+```
+
+### Flujo de eliminación
+
+```
+1. Usuario elimina un nodo definitivamente (papelera → eliminar)
+2. Alfresco borra el metadata de la DB
+3. EagerContentStoreCleaner (post-commit) ejecuta delete en contentStoresToClean
+4. CachingContentStore.delete() → elimina del cache local
+5. MinIOContentStore.delete() → elimina el objeto del bucket S3
+```
+
+## Configuración
+
+### Propiedades obligatorias
+
+| Propiedad | Descripción | Ejemplo |
+|---|---|---|
+| `s3.accessKey` | Access key de MinIO/S3 | `minioadmin` |
+| `s3.secretKey` | Secret key de MinIO/S3 | `minioadmin` |
+| `s3.bucketName` | Nombre del bucket S3 | `alfresco` |
+| `s3.regionName` | Región AWS o identificador | `us-east-1` |
+| `s3.endpoint` | URL del endpoint S3 (vacío = AWS) | `http://minio:9000` |
+| `s3.rootDirectory` | Prefijo dentro del bucket | `/alfresco/contentstore` |
+
+### Propiedades de conexión
+
+| Propiedad | Default | Descripción |
+|---|---|---|
+| `s3.pathStyleAccess` | `true` | Path-style access (requerido para MinIO). `false` para AWS S3 virtual-hosted style |
+| `s3.client.connectionTimeout` | `50000` | Timeout de conexión en ms |
+| `s3.client.connectionTTL` | `60000` | TTL de conexión en ms |
+| `s3.client.maxErrorRetry` | `5` | Reintentos máximos ante errores |
+
+### Propiedades de cache
+
+| Propiedad | Default | Descripción |
+|---|---|---|
+| `s3.content.caching.cacheOnInbound` | `true` | Cachear contenido al escribir (evita cache miss en primera lectura) |
+| `s3.content.caching.minFileAgeMillis` | `60000` | Edad mínima de archivo en cache antes de poder limpiarlo |
+| `s3.content.caching.maxDeleteWatchCount` | `1` | Veces que se intenta eliminar un archivo cacheado |
+| `s3.content.caching.contentCleanup.cronExpression` | `0 0 3 * * ?` | Cron del job de limpieza de cache (default: 3AM diario) |
+| `s3.quota.maxUsageMB` | `4096` | Uso máximo del cache local en MB |
+| `s3.quota.maxFileSizeMB` | `0` | Tamaño máximo de archivo en cache (0 = sin límite) |
+| `s3.content.cache.cachedcontent` | `/tmp/cachedcontent` | Directorio del cache local |
+
+### Propiedades de cleanup
+
+| Propiedad | Default | Descripción |
+|---|---|---|
+| `system.content.eagerOrphanCleanup` | `true` | Eliminar contenido huérfano inmediatamente al hacer commit de la transacción |
+| `system.content.orphanProtectDays` | `1` | Días de protección antes de eliminar contenido huérfano |
+
+## Integración en un proyecto ACS
+
+### Instalación del AMP
+
+1. Compilar el conector:
+   ```bash
+   mvn clean package -DskipTests
+   ```
+   Genera `target/s3-open-connector-1.0-SNAPSHOT.amp`
+
+2. Instalar el AMP en el WAR de Alfresco:
+   ```bash
+   java -jar alfresco-mmt.jar install s3-open-connector-1.0-SNAPSHOT.amp alfresco.war -force
+   ```
+
+3. Configurar las propiedades `s3.*` en `alfresco-global.properties`
+
+### Docker
+
+El conector incluye un Dockerfile que construye una imagen ACS con el AMP instalado. Usar `./run.sh build_start` para levantar el entorno de desarrollo con MinIO.
+
+## Dependencias incluidas en el AMP
+
+El AMP empaqueta las siguientes librerías en `/lib`:
+
+- AWS SDK v2 S3 (`software.amazon.awssdk:s3:2.42.30`)
+- AWS SDK v2 URL Connection Client (HTTP client síncrono, sin Netty ni Apache HttpClient)
+- Dependencias transitivas del SDK v2
+
+**Excluidas** (ya provistas por Alfresco, evitar conflictos de classpath):
+- `slf4j-api`, `commons-logging`, `commons-codec`
+- `io.netty:*`, `org.apache.httpcomponents:*`
+
+## Tecnologías
+
+- **Alfresco Content Services 26.1.0 Community**
+- **Alfresco SDK 4.15.0**
+- **AWS SDK v2** (2.42.30) con `url-connection-client`
+- **Java 21**
+- **Spring Framework** (provided by Alfresco)
+- **MinIO** (S3-compatible)
+
+## Comandos
+
+| Comando | Descripción |
+|---|---|
+| `./run.sh build_start` | Build + crear imagen Docker + levantar entorno |
+| `./run.sh stop` | Detener contenedores |
+| `./run.sh purge` | Detener + eliminar volúmenes |
+| `./run.sh tail` | Ver logs de contenedores |
+| `./run.sh reload_acs` | Reconstruir módulo + reiniciar ACS |
+| `mvn clean package` | Compilar y generar AMP |
+| `mvn verify` | Ejecutar tests de integración |

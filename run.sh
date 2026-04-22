@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export COMPOSE_FILE_PATH=${PWD}/target/classes/docker/docker-compose.yml
+export COMPOSE_FILE_PATH="${PWD}/target/classes/docker/docker-compose.yml"
 
 if [ -z "${M2_HOME}" ]; then
   export MVN_EXEC="mvn"
@@ -9,62 +9,44 @@ else
 fi
 
 start() {
-    docker volume create alfresco-s3-adapter-acs-volume
-    docker volume create alfresco-s3-adapter-db-volume
-    docker volume create alfresco-s3-adapter-ass-volume
-    docker-compose -f $COMPOSE_FILE_PATH up --build -d
-}
-
-start_share() {
-    docker-compose -f $COMPOSE_FILE_PATH up --build -d alfresco-test-share
-}
-
-start_acs() {
-    docker-compose -f $COMPOSE_FILE_PATH up --build -d alfresco-test-acs
+    docker volume create s3-open-connector-acs-volume
+    docker volume create s3-open-connector-db-volume
+    docker volume create s3-open-connector-ass-volume
+    docker volume create s3-open-connector-minio-volume
+    docker compose -f "$COMPOSE_FILE_PATH" up --build -d
 }
 
 down() {
-    if [ -f $COMPOSE_FILE_PATH ]; then
-        docker-compose -f $COMPOSE_FILE_PATH down
+    if [ -f "$COMPOSE_FILE_PATH" ]; then
+        docker compose -f "$COMPOSE_FILE_PATH" down
     fi
 }
 
 purge() {
-    docker volume rm -f alfresco-s3-adapter-acs-volume
-    docker volume rm -f alfresco-s3-adapter-db-volume
-    docker volume rm -f alfresco-s3-adapter-ass-volume
+    docker volume rm -f s3-open-connector-acs-volume
+    docker volume rm -f s3-open-connector-db-volume
+    docker volume rm -f s3-open-connector-ass-volume
+    docker volume rm -f s3-open-connector-minio-volume
 }
 
 build() {
     $MVN_EXEC clean package
 }
 
-build_share() {
-    docker-compose -f $COMPOSE_FILE_PATH kill alfresco-s3-adapter-share
-    yes | docker-compose -f $COMPOSE_FILE_PATH rm -f alfresco-s3-adapter-share
-    $MVN_EXEC clean package -pl alfresco-s3-adapter-share,alfresco-s3-adapter-share-docker
-}
-
-build_acs() {
-    docker-compose -f $COMPOSE_FILE_PATH kill alfresco-s3-adapter-acs
-    yes | docker-compose -f $COMPOSE_FILE_PATH rm -f alfresco-s3-adapter-acs
-    $MVN_EXEC clean package -pl integration-tests,alfresco-s3-adapter-platform,alfresco-s3-adapter-platform-docker,alfresco-s3-adapter-testdeps
-}
-
 tail() {
-    docker-compose -f $COMPOSE_FILE_PATH logs -f
+    docker compose -f "$COMPOSE_FILE_PATH" logs -f
 }
 
 tail_all() {
-    docker-compose -f $COMPOSE_FILE_PATH logs --tail="all"
+    docker compose -f "$COMPOSE_FILE_PATH" logs --tail="all"
 }
 
 prepare_test() {
-    $MVN_EXEC verify -DskipTests=true -pl alfresco-s3-adapter-platform,integration-tests,alfresco-s3-adapter-testdeps,alfresco-s3-adapter-platform-docker
+    $MVN_EXEC verify -DskipTests=true
 }
 
 test() {
-    $MVN_EXEC verify -pl alfresco-s3-adapter-platform,integration-tests,alfresco-s3-adapter-testdeps
+    $MVN_EXEC verify
 }
 
 case "$1" in
@@ -95,16 +77,6 @@ case "$1" in
   tail)
     tail
     ;;
-  reload_share)
-    build_share
-    start_share
-    tail
-    ;;
-  reload_acs)
-    build_acs
-    start_acs
-    tail
-    ;;
   build_test)
     down
     build
@@ -118,5 +90,5 @@ case "$1" in
     test
     ;;
   *)
-    echo "Usage: $0 {build_start|build_start_it_supported|start|stop|purge|tail|reload_share|reload_acs|build_test|test}"
+    echo "Usage: $0 {build_start|build_start_it_supported|start|stop|purge|tail|build_test|test}"
 esac

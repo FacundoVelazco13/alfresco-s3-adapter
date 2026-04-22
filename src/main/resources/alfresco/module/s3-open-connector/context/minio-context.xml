@@ -1,0 +1,95 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+          http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="assa.minioCachingContentStore"
+          class="org.alfresco.repo.content.caching.CachingContentStore"
+          init-method="init">
+        <property name="backingStore" ref="assa.minioContentStore"/>
+        <property name="cache" ref="assa.minioContentCache"/>
+        <property name="cacheOnInbound" value="${s3.content.caching.cacheOnInbound}"/>
+        <property name="quota" ref="assa.minioQuotaManager"/>
+    </bean>
+
+    <bean id="assa.minioContentCache" class="org.alfresco.repo.content.caching.ContentCacheImpl">
+        <property name="memoryStore" ref="assa.minioContentStoreCache"/>
+        <property name="cacheRoot" value="${s3.content.cache.cachedcontent}"/>
+    </bean>
+
+    <bean id="assa.minioContentStoreCache" factory-bean="cacheFactory" factory-method="createCache">
+        <constructor-arg value="cache.cachingContentStoreCache"/>
+    </bean>
+
+    <bean id="assa.minioQuotaManager"
+          class="org.alfresco.repo.content.caching.quota.StandardQuotaStrategy"
+          init-method="init"
+          destroy-method="shutdown">
+        <property name="maxUsageMB" value="${s3.quota.maxUsageMB}"/>
+        <property name="maxFileSizeMB" value="${s3.quota.maxFileSizeMB}"/>
+        <property name="cache" ref="assa.minioContentCache"/>
+        <property name="cleaner" ref="assa.minioCachedContentCleaner"/>
+    </bean>
+
+    <bean id="assa.minioCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+        <property name="jobClass" value="org.alfresco.repo.content.caching.cleanup.CachedContentCleanupJob"/>
+        <property name="jobDataAsMap">
+            <map>
+                <entry key="cachedContentCleaner">
+                    <ref bean="assa.minioCachedContentCleaner"/>
+                </entry>
+            </map>
+        </property>
+    </bean>
+
+    <bean id="assa.minioCachedContentCleaner"
+          class="org.alfresco.repo.content.caching.cleanup.CachedContentCleaner"
+          init-method="init">
+        <property name="minFileAgeMillis" value="${s3.content.caching.minFileAgeMillis}"/>
+        <property name="maxDeleteWatchCount" value="${s3.content.caching.maxDeleteWatchCount}"/>
+        <property name="cache" ref="assa.minioContentCache"/>
+        <property name="usageTracker" ref="assa.minioQuotaManager"/>
+    </bean>
+
+    <bean id="assa.minioCleanerTrigger" class="org.alfresco.schedule.AlfrescoSchedulerAccessorBean">
+        <property name="scheduler" ref="schedulerFactory"/>
+        <property name="triggers">
+            <list>
+                <bean id="assa.minioCachingContentStoreCleaner"
+                     class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+                    <property name="cronExpression" value="${s3.content.caching.contentCleanup.cronExpression}"/>
+                    <property name="jobDetail" ref="assa.minioCleanerJobDetail"/>
+                </bean>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="assa.minioContentStore"
+          class="com.assa.alfresco.s3.MinIOContentStore"
+          init-method="init"
+          destroy-method="destroy">
+        <property name="accessKey" value="${s3.accessKey}"/>
+        <property name="secretKey" value="${s3.secretKey}"/>
+        <property name="bucketName" value="${s3.bucketName}"/>
+        <property name="regionName" value="${s3.regionName}"/>
+        <property name="rootDirectory" value="${s3.rootDirectory}"/>
+        <property name="endpoint" value="${s3.endpoint}"/>
+        <property name="pathStyleAccess" value="${s3.pathStyleAccess}"/>
+        <property name="connectionTimeout" value="${s3.client.connectionTimeout}"/>
+        <property name="connectionTTL" value="${s3.client.connectionTTL}"/>
+        <property name="maxErrorRetry" value="${s3.client.maxErrorRetry}"/>
+    </bean>
+
+    <bean id="contentStoresToClean" class="java.util.ArrayList">
+        <constructor-arg>
+            <list>
+                <ref bean="assa.minioCachingContentStore"/>
+                <ref bean="assa.minioContentStore"/>
+            </list>
+        </constructor-arg>
+    </bean>
+
+    <alias name="assa.minioCachingContentStore" alias="fileContentStore"/>
+
+</beans>

@@ -1,33 +1,37 @@
-version: '3.4'
 services:
-  alfresco-s3-adapter-share:
-    image: alfresco-share-alfresco-test:development
+  s3-open-connector-acs:
+    image: alfresco-content-services-s3-open-connector:development
     build:
       dockerfile: ./Dockerfile
-      context: ../../../alfresco-s3-adapter-share-docker/target
+      context: ../../../target
     environment:
-      CATALINA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:8888"
-      REPO_HOST: alfresco-s3-adapter-acs
-      REPO_PORT: 8080
-    ports:
-      - "${share.port}:8080"
-      - "${share.debug.port}:8888"
-  alfresco-s3-adapter-acs:
-    image: alfresco-content-services-alfresco-test:development
-    build:
-      dockerfile: ./Dockerfile
-      context: ../../../alfresco-s3-adapter-platform-docker/target
-    environment:
+      JAVA_TOOL_OPTIONS: "${keystore.settings}"
+      JAVA_OPTS: "
+        -Dsolr.secureComms=secret
+        -Dsolr.sharedSecret=secret
+        -Dmessaging.broker.url=\"failover:(nio://s3-open-connector-activemq:61616)?timeout=3000&jms.useCompression=true\"
+        -Ds3.accessKey=minioadmin
+        -Ds3.secretKey=minioadmin
+        -Ds3.bucketName=alfresco
+        -Ds3.endpoint=http://s3-open-connector-minio:9000
+        -Ds3.regionName=us-east-1
+        -Ds3.pathStyleAccess=true
+        "
       CATALINA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:8888"
     ports:
       - "${acs.port}:8080"
       - "${acs.debug.port}:8888"
     volumes:
-      - alfresco-s3-adapter-acs-volume:/usr/local/tomcat/alf_data
+      - s3-open-connector-acs-volume:/usr/local/tomcat/alf_data
     depends_on:
-      - alfresco-s3-adapter-postgres
-  alfresco-s3-adapter-postgres:
-    image: postgres:9.6
+      s3-open-connector-postgres:
+        condition: service_started
+      s3-open-connector-minio:
+        condition: service_healthy
+      s3-open-connector-minio-init:
+        condition: service_completed_successfully
+  s3-open-connector-postgres:
+    image: postgres:16.5
     environment:
       POSTGRES_DB: alfresco
       POSTGRES_USER: alfresco
@@ -36,24 +40,65 @@ services:
     ports:
       - "${postgres.port}:5432"
     volumes:
-      - alfresco-s3-adapter-db-volume:/var/lib/postgresql/data
-  alfresco-s3-adapter-ass:
-    image: alfresco/alfresco-search-services:1.2.0
+      - s3-open-connector-db-volume:/var/lib/postgresql/data
+  s3-open-connector-ass:
+    image: alfresco/alfresco-search-services:2.0.15
     environment:
-      SOLR_ALFRESCO_HOST: alfresco-s3-adapter-acs
+      SOLR_ALFRESCO_HOST: s3-open-connector-acs
       SOLR_ALFRESCO_PORT: 8080
-      SOLR_SOLR_HOST: alfresco-s3-adapter-ass
+      SOLR_SOLR_HOST: s3-open-connector-ass
       SOLR_SOLR_PORT: 8983
       SOLR_CREATE_ALFRESCO_DEFAULTS: alfresco,archive
+      ALFRESCO_SECURE_COMMS: "secret"
+      JAVA_TOOL_OPTIONS: "-Dalfresco.secureComms.secret=secret"
     ports:
       - "8983:8983"
     volumes:
-      - alfresco-s3-adapter-ass-volume:/opt/alfresco-search-services/contentstore
-      - alfresco-s3-adapter-ass-volume:/opt/alfresco-search-services/data
+      - s3-open-connector-ass-volume:/opt/alfresco-search-services/contentstore
+      - s3-open-connector-ass-volume:/opt/alfresco-search-services/data
+  s3-open-connector-activemq:
+    image: alfresco/alfresco-activemq:5.18-jre17-rockylinux8
+    mem_limit: 1g
+    ports:
+      - 8161:8161
+      - 5672:5672
+      - 61616:61616
+      - 61613:61613
+  s3-open-connector-minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - s3-open-connector-minio-volume:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  s3-open-connector-minio-init:
+    image: minio/mc:latest
+    depends_on:
+      s3-open-connector-minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://s3-open-connector-minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing myminio/alfresco;
+      mc anonymous set download myminio/alfresco;
+      exit 0;
+      "
+
 volumes:
-  alfresco-s3-adapter-acs-volume:
+  s3-open-connector-acs-volume:
     external: true
-  alfresco-s3-adapter-db-volume:
+  s3-open-connector-db-volume:
     external: true
-  alfresco-s3-adapter-ass-volume:
+  s3-open-connector-ass-volume:
+    external: true
+  s3-open-connector-minio-volume:
     external: true
