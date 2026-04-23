@@ -85,7 +85,6 @@
         <constructor-arg>
             <list>
                 <ref bean="assa.s3CachingContentStore"/>
-                <ref bean="assa.s3ContentStore"/>
             </list>
         </constructor-arg>
     </bean>

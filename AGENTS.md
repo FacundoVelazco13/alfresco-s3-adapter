@@ -90,7 +90,7 @@ fileContentStore (alias) → CachingContentStore → S3ContentStore → S3 Bucke
 
 3. **EagerContentStoreCleaner con eagerOrphanCleanup=true**: Borra contenido huérfano de S3 inmediatamente al eliminar un nodo. Esto significa que NO se hace backup al `deletedContentStore` antes de borrar (Alfresco no llama listeners en eager mode por diseño). La "papelera" de Content App es el mecanismo de seguridad para recuperación.
 
-4. **contentStoresToClean incluye ambos stores**: La lista incluye `assa.s3CachingContentStore` y `assa.s3ContentStore` para que el EagerContentStoreCleaner elimine tanto del cache local como del bucket S3.
+4. **contentStoresToClean incluye solo el CachingContentStore**: La lista incluye únicamente `assa.s3CachingContentStore` porque `CachingContentStore.delete()` ya delega internamente al backing store (`S3ContentStore.delete()`). Incluir ambos stores causaría una doble llamada a `deleteObject` en S3 por cada contenido huérfano eliminado.
 
 5. **Alias en vez de parent bean**: Se usa `<alias name="assa.s3CachingContentStore" alias="fileContentStore"/>` en vez de `<bean id="fileContentStore" parent="..."/>` para garantizar que ambos nombres referencien la misma instancia (el parent crearía una instancia diferente con doble init).
 
