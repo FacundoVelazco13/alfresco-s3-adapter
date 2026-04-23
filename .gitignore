@@ -16,6 +16,7 @@ buildNumber.properties
 .metadata
 .project
 .classpath
+.factorypath
 bin/
 tmp/
 *.tmp
@@ -28,11 +29,7 @@ tmp/
 **.iml
 
 # Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+.vscode/
 
 # macOS
 *.DS_Store

@@ -18,9 +18,9 @@ import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 
-public class MinIOContentReader extends AbstractContentReader {
+public class S3ContentReader extends AbstractContentReader {
 
-    private static final Log LOG = LogFactory.getLog(MinIOContentReader.class);
+    private static final Log LOG = LogFactory.getLog(S3ContentReader.class);
 
     private final String key;
     private final S3Client s3Client;
@@ -28,7 +28,7 @@ public class MinIOContentReader extends AbstractContentReader {
     private ResponseInputStream<GetObjectResponse> s3ResponseStream;
     private HeadObjectResponse headObjectResponse;
 
-    protected MinIOContentReader(String key, String contentUrl, S3Client s3Client, String bucket) {
+    protected S3ContentReader(String key, String contentUrl, S3Client s3Client, String bucket) {
         super(contentUrl);
         this.key = key;
         this.s3Client = s3Client;
@@ -68,7 +68,7 @@ public class MinIOContentReader extends AbstractContentReader {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Called createReader for contentUrl -> " + getContentUrl() + ", Key: " + key);
         }
-        return new MinIOContentReader(key, getContentUrl(), s3Client, bucket);
+        return new S3ContentReader(key, getContentUrl(), s3Client, bucket);
     }
 
     @Override

@@ -11,33 +11,33 @@ import org.springframework.context.ApplicationContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class MinIOContentStoreIT extends AbstractAlfrescoIT {
+public class S3CachingContentStoreIT extends AbstractAlfrescoIT {
 
     @Test
-    public void testWriteAndReadContent() {
+    public void testWriteAndReadThroughCache() {
         ApplicationContext ctx = getApplicationContext();
-        ContentStore minioContentStore = (ContentStore) ctx.getBean("assa.minioContentStore");
+        ContentStore cachingContentStore = (ContentStore) ctx.getBean("assa.s3CachingContentStore");
 
-        final String TEST_TEXT_CONTENT = "Hello MinIO from Alfresco!";
+        final String TEST_TEXT_CONTENT = "Cached content test";
         ContentContext context = new ContentContext(null, null);
-        ContentWriter writer = minioContentStore.getWriter(context);
+        ContentWriter writer = cachingContentStore.getWriter(context);
         writer.putContent(TEST_TEXT_CONTENT);
         String contentUrl = writer.getContentUrl();
 
         try {
-            ContentReader reader = minioContentStore.getReader(contentUrl);
+            ContentReader reader = cachingContentStore.getReader(contentUrl);
             String contentString = reader.getContentString();
             assertEquals(TEST_TEXT_CONTENT, contentString);
         } finally {
-            boolean deleted = minioContentStore.delete(contentUrl);
+            boolean deleted = cachingContentStore.delete(contentUrl);
             assertTrue(deleted);
         }
     }
 
     @Test
-    public void testWriteSupported() {
+    public void testCacheWriteSupported() {
         ApplicationContext ctx = getApplicationContext();
-        ContentStore minioContentStore = (ContentStore) ctx.getBean("assa.minioContentStore");
-        assertTrue(minioContentStore.isWriteSupported());
+        ContentStore cachingContentStore = (ContentStore) ctx.getBean("assa.s3CachingContentStore");
+        assertTrue(cachingContentStore.isWriteSupported());
     }
 }

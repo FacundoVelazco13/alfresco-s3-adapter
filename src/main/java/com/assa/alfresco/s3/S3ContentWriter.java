@@ -8,7 +8,6 @@ import org.alfresco.util.TempFileProvider;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,9 +15,9 @@ import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 
-public class MinIOContentWriter extends AbstractContentWriter {
+public class S3ContentWriter extends AbstractContentWriter {
 
-    private static final Log LOG = LogFactory.getLog(MinIOContentWriter.class);
+    private static final Log LOG = LogFactory.getLog(S3ContentWriter.class);
 
     private final S3Client client;
     private final String key;
@@ -26,18 +25,18 @@ public class MinIOContentWriter extends AbstractContentWriter {
     private File tempFile;
     private long size;
 
-    public MinIOContentWriter(String bucketName, String key, String contentUrl, ContentReader existingContentReader,
-                              S3Client client) {
+    public S3ContentWriter(String bucketName, String key, String contentUrl, ContentReader existingContentReader,
+                           S3Client client) {
         super(contentUrl, existingContentReader);
         this.key = key;
         this.client = client;
         this.bucketName = bucketName;
-        addListener(new MinIOWriteStreamListener(this));
+        addListener(new S3WriteStreamListener(this));
     }
 
     @Override
     protected ContentReader createReader() throws ContentIOException {
-        return new MinIOContentReader(key, getContentUrl(), client, bucketName);
+        return new S3ContentReader(key, getContentUrl(), client, bucketName);
     }
 
     @Override
@@ -45,16 +44,16 @@ public class MinIOContentWriter extends AbstractContentWriter {
         try {
             String uuid = GUID.generate();
             if (LOG.isDebugEnabled()) {
-                LOG.debug("MinIOContentWriter Creating Temp File: uuid=" + uuid);
+                LOG.debug("S3ContentWriter Creating Temp File: uuid=" + uuid);
             }
             tempFile = TempFileProvider.createTempFile(uuid, ".bin");
             OutputStream os = new FileOutputStream(tempFile);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("MinIOContentWriter Returning Channel to Temp File: uuid=" + uuid);
+                LOG.debug("S3ContentWriter Returning Channel to Temp File: uuid=" + uuid);
             }
             return Channels.newChannel(os);
         } catch (Throwable e) {
-            throw new ContentIOException("MinIOContentWriter.getDirectWritableChannel(): Failed to open channel. " + this, e);
+            throw new ContentIOException("S3ContentWriter.getDirectWritableChannel(): Failed to open channel. " + this, e);
         }
     }
 

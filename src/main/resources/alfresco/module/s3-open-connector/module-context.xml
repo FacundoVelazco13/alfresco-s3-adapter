@@ -4,6 +4,6 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
           http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <import resource="classpath:alfresco/module/${project.artifactId}/context/minio-context.xml" />
+    <import resource="classpath:alfresco/module/${project.artifactId}/context/s3-context.xml" />
 
 </beans>

@@ -8,13 +8,13 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.File;
 
-public class MinIOWriteStreamListener implements ContentStreamListener {
+public class S3WriteStreamListener implements ContentStreamListener {
 
-    private static final Log LOG = LogFactory.getLog(MinIOWriteStreamListener.class);
+    private static final Log LOG = LogFactory.getLog(S3WriteStreamListener.class);
 
-    private final MinIOContentWriter writer;
+    private final S3ContentWriter writer;
 
-    public MinIOWriteStreamListener(MinIOContentWriter writer) {
+    public S3WriteStreamListener(S3ContentWriter writer) {
         this.writer = writer;
     }
 
@@ -46,7 +46,7 @@ public class MinIOWriteStreamListener implements ContentStreamListener {
                 LOG.trace("Upload completed for bucket " + writer.getBucketName() + " with key " + writer.getKey());
             }
         } catch (Exception e) {
-            throw new ContentIOException("MinIOWriteStreamListener Failed to Upload File for bucket "
+            throw new ContentIOException("S3WriteStreamListener Failed to Upload File for bucket "
                     + writer.getBucketName() + " with key " + writer.getKey(), e);
         } finally {
             file.delete();

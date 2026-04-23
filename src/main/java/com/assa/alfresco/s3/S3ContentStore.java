@@ -37,10 +37,10 @@ import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.Map;
 
-public class MinIOContentStore extends AbstractContentStore
+public class S3ContentStore extends AbstractContentStore
         implements ApplicationContextAware, ApplicationListener<ApplicationEvent>, InitializingBean, DisposableBean {
 
-    private static final Log LOG = LogFactory.getLog(MinIOContentStore.class);
+    private static final Log LOG = LogFactory.getLog(S3ContentStore.class);
 
     private ApplicationContext applicationContext;
 
@@ -81,7 +81,7 @@ public class MinIOContentStore extends AbstractContentStore
     @Override
     public ContentReader getReader(String contentUrl) {
         String key = makeS3Key(contentUrl);
-        return new MinIOContentReader(key, contentUrl, s3Client, bucketName);
+        return new S3ContentReader(key, contentUrl, s3Client, bucketName);
     }
 
     public S3Client getS3Client() {
@@ -123,7 +123,7 @@ public class MinIOContentStore extends AbstractContentStore
 
         s3Client = builder.build();
 
-        LOG.info("MinIO/S3 Content Store initialized. Bucket: " + bucketName + ", Endpoint: "
+        LOG.info("S3 Content Store initialized. Bucket: " + bucketName + ", Endpoint: "
                 + (StringUtils.isNotBlank(endpoint) ? endpoint : "default AWS"));
     }
 
@@ -167,7 +167,7 @@ public class MinIOContentStore extends AbstractContentStore
             contentUrl = createNewUrl();
         }
         String key = makeS3Key(contentUrl);
-        return new MinIOContentWriter(bucketName, key, contentUrl, existingContentReader, s3Client);
+        return new S3ContentWriter(bucketName, key, contentUrl, existingContentReader, s3Client);
     }
 
     public static String createNewUrl() {
@@ -203,13 +203,11 @@ public class MinIOContentStore extends AbstractContentStore
     public boolean delete(String contentUrl) {
         try {
             String key = makeS3Key(contentUrl);
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Deleting object from S3 with url: " + contentUrl + ", key: " + key);
-            }
+            LOG.debug("Deleting object from S3 with url: " + contentUrl + ", key: " + key);
             s3Client.deleteObject(builder -> builder.bucket(bucketName).key(key));
             return true;
         } catch (Exception e) {
-            LOG.trace("Error deleting S3 Object", e);
+            LOG.debug("Error deleting S3 Object", e);
         }
         return false;
     }
@@ -221,7 +219,8 @@ public class MinIOContentStore extends AbstractContentStore
     @Override
     public void onApplicationEvent(ApplicationEvent event) {
         if (event instanceof ContextRefreshedEvent && event.getSource() == this.applicationContext) {
-            publishEvent(((ContextRefreshedEvent) event).getApplicationContext(), Collections.<String, Serializable>emptyMap());
+            publishEvent(((ContextRefreshedEvent) event).getApplicationContext(),
+                    Collections.<String, Serializable>emptyMap());
         }
     }
 
@@ -233,6 +232,14 @@ public class MinIOContentStore extends AbstractContentStore
         Assert.isTrue(maxErrorRetry >= 0, "s3.client.maxErrorRetry must be >= 0");
         Assert.isTrue(connectionTTL >= 0, "s3.client.connectionTTL must be >= 0");
         Assert.isTrue(connectionTimeout >= 0, "s3.client.connectionTimeout must be >= 0");
+        if (StringUtils.isNotBlank(endpoint)) {
+            URI uri = URI.create(endpoint);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                throw new IllegalArgumentException(
+                        "s3.endpoint must include http:// or https:// scheme. Provided: " + endpoint);
+            }
+        }
     }
 
     @Override

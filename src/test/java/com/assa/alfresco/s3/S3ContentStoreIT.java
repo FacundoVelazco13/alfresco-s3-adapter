@@ -11,33 +11,33 @@ import org.springframework.context.ApplicationContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class MinIOCachingContentStoreIT extends AbstractAlfrescoIT {
+public class S3ContentStoreIT extends AbstractAlfrescoIT {
 
     @Test
-    public void testWriteAndReadThroughCache() {
+    public void testWriteAndReadContent() {
         ApplicationContext ctx = getApplicationContext();
-        ContentStore cachingContentStore = (ContentStore) ctx.getBean("assa.minioCachingContentStore");
+        ContentStore s3ContentStore = (ContentStore) ctx.getBean("assa.s3ContentStore");
 
-        final String TEST_TEXT_CONTENT = "Cached content test";
+        final String TEST_TEXT_CONTENT = "Hello S3 from Alfresco!";
         ContentContext context = new ContentContext(null, null);
-        ContentWriter writer = cachingContentStore.getWriter(context);
+        ContentWriter writer = s3ContentStore.getWriter(context);
         writer.putContent(TEST_TEXT_CONTENT);
         String contentUrl = writer.getContentUrl();
 
         try {
-            ContentReader reader = cachingContentStore.getReader(contentUrl);
+            ContentReader reader = s3ContentStore.getReader(contentUrl);
             String contentString = reader.getContentString();
             assertEquals(TEST_TEXT_CONTENT, contentString);
         } finally {
-            boolean deleted = cachingContentStore.delete(contentUrl);
+            boolean deleted = s3ContentStore.delete(contentUrl);
             assertTrue(deleted);
         }
     }
 
     @Test
-    public void testCacheWriteSupported() {
+    public void testWriteSupported() {
         ApplicationContext ctx = getApplicationContext();
-        ContentStore cachingContentStore = (ContentStore) ctx.getBean("assa.minioCachingContentStore");
-        assertTrue(cachingContentStore.isWriteSupported());
+        ContentStore s3ContentStore = (ContentStore) ctx.getBean("assa.s3ContentStore");
+        assertTrue(s3ContentStore.isWriteSupported());
     }
 }
