@@ -37,9 +37,6 @@ public class S3ContentReader extends AbstractContentReader {
 
     protected void closeFileObject() throws IOException {
         if (s3ResponseStream != null) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Closing s3 response stream for reader " + key);
-            }
             s3ResponseStream.close();
             s3ResponseStream = null;
         }
@@ -47,18 +44,12 @@ public class S3ContentReader extends AbstractContentReader {
 
     protected void lazyInitFileObject() {
         if (s3ResponseStream == null) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Lazy init for file object for " + bucket + " - " + key);
-            }
             this.s3ResponseStream = getObject();
         }
     }
 
     protected void lazyInitFileMetadata() {
         if (headObjectResponse == null) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Lazy init for file metadata for " + bucket + " - " + key);
-            }
             headObjectResponse = getHeadObject();
         }
     }
@@ -142,9 +133,7 @@ public class S3ContentReader extends AbstractContentReader {
 
     private ResponseInputStream<GetObjectResponse> getObject() {
         try {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("GETTING OBJECT - BUCKET: " + bucket + " KEY: " + key);
-            }
+            LOG.trace("GETTING OBJECT - BUCKET: " + bucket + " KEY: " + key);
             GetObjectRequest request = GetObjectRequest.builder()
                     .bucket(bucket)
                     .key(key)
@@ -158,9 +147,7 @@ public class S3ContentReader extends AbstractContentReader {
 
     private HeadObjectResponse getHeadObject() {
         try {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("GETTING OBJECT METADATA - BUCKET: " + bucket + " KEY: " + key);
-            }
+            LOG.debug("GETTING OBJECT METADATA - BUCKET: " + bucket + " KEY: " + key);
             HeadObjectRequest request = HeadObjectRequest.builder()
                     .bucket(bucket)
                     .key(key)

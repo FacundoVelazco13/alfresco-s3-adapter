@@ -48,9 +48,8 @@ public class S3ContentWriter extends AbstractContentWriter {
             }
             tempFile = TempFileProvider.createTempFile(uuid, ".bin");
             OutputStream os = new FileOutputStream(tempFile);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("S3ContentWriter Returning Channel to Temp File: uuid=" + uuid);
-            }
+            
+            LOG.debug("S3ContentWriter Returning Channel to Temp File: uuid=" + uuid);
             return Channels.newChannel(os);
         } catch (Throwable e) {
             throw new ContentIOException("S3ContentWriter.getDirectWritableChannel(): Failed to open channel. " + this, e);
